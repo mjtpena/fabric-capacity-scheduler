@@ -1,0 +1,24 @@
+# PowerShell
+*.ps1xml
+*.psd1
+*.psm1
+
+# Logs
+logs/
+*.log
+
+# Local files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Environment files
+.env
+*.env
+
+# Backup
+*.bak
+*.backup
