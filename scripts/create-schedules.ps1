@@ -78,23 +78,20 @@ function New-CapacitySchedule {
     Write-Output "✓ Schedule '$ScheduleName' created and linked to '$RunbookName'"
 }
 
-# Remove existing schedules if they exist
-Write-Output "`nCleaning up existing schedules..."
-$scheduleNames = @("Fabric-Capacity-Resume-Weekdays", "Fabric-Capacity-Pause-Weekdays", "Fabric-Capacity-Pause-Weekend")
-foreach ($scheduleName in $scheduleNames) {
-    az automation schedule delete `
-        --resource-group $ResourceGroupName `
-        --automation-account-name $AutomationAccountName `
-        --name $scheduleName `
-        --yes 2>&1 | Out-Null
-}
+# Generate unique schedule names based on capacity name
+$capacityShort = $CapacityName.Replace("fabricdofnetzero", "").Replace("ause", "").Substring(0,2)
+$schedulePrefix = "Fabric-$capacityShort"
+
+# Check if schedules already exist and skip if they do
+Write-Output "`nCreating schedules for capacity: $CapacityName"
+$existingSchedules = az automation schedule list --resource-group $ResourceGroupName --automation-account-name $AutomationAccountName --query "[].name" -o tsv 2>&1
 
 # Create schedules
 Write-Output "`nCreating new schedules..."
 
 # Create Resume Schedule (8:00 AM - Weekdays)
-New-CapacitySchedule -ScheduleName "Fabric-Capacity-Resume-Weekdays" `
-    -Description "Resume Fabric Capacity every weekday at 8:00 AM" `
+New-CapacitySchedule -ScheduleName "$schedulePrefix-Resume-Weekdays" `
+    -Description "Resume $CapacityName every weekday at 8:00 AM" `
     -RunbookName "Resume-Capacity" `
     -Hour "8" `
     -ResourceGroupName $ResourceGroupName `
@@ -103,8 +100,8 @@ New-CapacitySchedule -ScheduleName "Fabric-Capacity-Resume-Weekdays" `
     -CapacityResourceGroup $ResourceGroupName
 
 # Create Pause Schedule (8:00 PM - Weekdays)
-New-CapacitySchedule -ScheduleName "Fabric-Capacity-Pause-Weekdays" `
-    -Description "Pause Fabric Capacity every weekday at 8:00 PM" `
+New-CapacitySchedule -ScheduleName "$schedulePrefix-Pause-Weekdays" `
+    -Description "Pause $CapacityName every weekday at 8:00 PM" `
     -RunbookName "Pause-Capacity" `
     -Hour "20" `
     -ResourceGroupName $ResourceGroupName `
@@ -113,8 +110,8 @@ New-CapacitySchedule -ScheduleName "Fabric-Capacity-Pause-Weekdays" `
     -CapacityResourceGroup $ResourceGroupName
 
 # Create Weekend Pause Schedule (Saturday 12:00 AM)
-New-CapacitySchedule -ScheduleName "Fabric-Capacity-Pause-Weekend" `
-    -Description "Ensure Fabric Capacity is paused for the entire weekend" `
+New-CapacitySchedule -ScheduleName "$schedulePrefix-Pause-Weekend" `
+    -Description "Ensure $CapacityName is paused for the entire weekend" `
     -RunbookName "Pause-Capacity" `
     -Hour "0" `
     -ResourceGroupName $ResourceGroupName `

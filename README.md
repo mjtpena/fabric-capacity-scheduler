@@ -71,6 +71,20 @@ cd scripts
 
 **Optional**: Use any [Azure timezone](https://docs.microsoft.com/en-us/windows-hardware/manufacture/desktop/default-time-zones) (e.g., "AUS Eastern Standard Time", "Pacific Standard Time")
 
+### Multiple Capacities
+
+Run the schedule creation script once for each capacity:
+
+```powershell
+.\create-schedules.ps1 -SubscriptionId "..." -ResourceGroupName "..." `
+  -AutomationAccountName "..." -CapacityName "fabric-capacity-1" -Timezone "..."
+
+.\create-schedules.ps1 -SubscriptionId "..." -ResourceGroupName "..." `
+  -AutomationAccountName "..." -CapacityName "fabric-capacity-2" -Timezone "..."
+```
+
+Each capacity gets its own unique set of schedules.
+
 ### Step 3: Verify Run As Account
 
 Ensure your Automation Account has a **"Run As Account"** (classic) for authentication. This is required for the runbooks to execute with proper permissions.
