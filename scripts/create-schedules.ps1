@@ -40,7 +40,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Helper function to create schedule
+# Helper function to create schedule and link to runbook using Azure CLI REST API
 function New-CapacitySchedule {
     param(
         [string]$ScheduleName,
@@ -50,32 +50,47 @@ function New-CapacitySchedule {
         [string]$ResourceGroupName,
         [string]$AutomationAccountName,
         [string]$CapacityName,
-        [string]$CapacityResourceGroup
+        [string]$CapacityResourceGroup,
+        [string]$SubscriptionId
     )
     
-    $startTime = (Get-Date).AddDays(1).ToString("yyyy-MM-ddTHH:00:00")
+    $startTime = (Get-Date).AddDays(1).Date.AddHours([int]$Hour).ToString("yyyy-MM-ddTHH:mm:sszzz")
     
     Write-Output "Creating schedule: $ScheduleName"
     
-    # Create schedule
-    az automation schedule create `
+    # Create schedule using Azure CLI
+    $scheduleResult = az automation schedule create `
         --resource-group $ResourceGroupName `
         --automation-account-name $AutomationAccountName `
         --name $ScheduleName `
-        --frequency Day `
-        --interval 1 `
         --start-time $startTime `
-        --description $Description | Out-Null
+        --frequency "Day" `
+        --interval 1 `
+        --time-zone $Timezone `
+        --description $Description 2>&1
     
-    # Link schedule to runbook
-    az automation job-schedule create `
-        --resource-group $ResourceGroupName `
-        --automation-account-name $AutomationAccountName `
-        --schedule-name $ScheduleName `
-        --runbook-name $RunbookName `
-        --parameters @{ CapacityName=$CapacityName; ResourceGroupName=$CapacityResourceGroup } | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        # Schedule might already exist, try to update it
+        Write-Output "  Schedule may already exist, continuing..."
+    }
+    
+    # Link schedule to runbook using REST API (Register-AzAutomationScheduledRunbook requires Az module)
+    $jobScheduleId = [guid]::NewGuid().ToString()
+    $baseUrl = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Automation/automationAccounts/$AutomationAccountName"
+    
+    $body = "{`"properties`":{`"schedule`":{`"name`":`"$ScheduleName`"},`"runbook`":{`"name`":`"$RunbookName`"},`"parameters`":{`"CapacityName`":`"$CapacityName`",`"ResourceGroupName`":`"$CapacityResourceGroup`"}}}"
+    
+    $linkResult = az rest --method put `
+        --url "$baseUrl/jobSchedules/${jobScheduleId}?api-version=2023-11-01" `
+        --body $body 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "  Failed to link schedule to runbook: $linkResult"
+        return $false
+    }
     
     Write-Output "✓ Schedule '$ScheduleName' created and linked to '$RunbookName'"
+    return $true
 }
 
 # Generate unique schedule names based on capacity name
@@ -97,7 +112,8 @@ New-CapacitySchedule -ScheduleName "$schedulePrefix-Resume-Weekdays" `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $AutomationAccountName `
     -CapacityName $CapacityName `
-    -CapacityResourceGroup $ResourceGroupName
+    -CapacityResourceGroup $ResourceGroupName `
+    -SubscriptionId $SubscriptionId
 
 # Create Pause Schedule (8:00 PM - Weekdays)
 New-CapacitySchedule -ScheduleName "$schedulePrefix-Pause-Weekdays" `
@@ -107,7 +123,8 @@ New-CapacitySchedule -ScheduleName "$schedulePrefix-Pause-Weekdays" `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $AutomationAccountName `
     -CapacityName $CapacityName `
-    -CapacityResourceGroup $ResourceGroupName
+    -CapacityResourceGroup $ResourceGroupName `
+    -SubscriptionId $SubscriptionId
 
 # Create Weekend Pause Schedule (Saturday 12:00 AM)
 New-CapacitySchedule -ScheduleName "$schedulePrefix-Pause-Weekend" `
@@ -117,7 +134,8 @@ New-CapacitySchedule -ScheduleName "$schedulePrefix-Pause-Weekend" `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $AutomationAccountName `
     -CapacityName $CapacityName `
-    -CapacityResourceGroup $ResourceGroupName
+    -CapacityResourceGroup $ResourceGroupName `
+    -SubscriptionId $SubscriptionId
 
 Write-Output "`n✓ Schedules created successfully!"
 

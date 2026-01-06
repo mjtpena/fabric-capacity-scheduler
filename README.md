@@ -24,8 +24,18 @@ This solution uses **Azure Automation runbooks** with PowerShell to automaticall
 
 ### 1. PowerShell Runbooks
 Located in `automation/runbooks/`:
-- **Resume-Capacity.ps1**: Resumes the Fabric Capacity (runs at 8am weekdays)
-- **Pause-Capacity.ps1**: Pauses the Fabric Capacity (runs at 8pm weekdays + all day weekends)
+
+**Generic Runbooks (with parameters):**
+- **Resume-Capacity.ps1**: Resumes a Fabric Capacity (requires CapacityName and ResourceGroupName parameters)
+- **Pause-Capacity.ps1**: Pauses a Fabric Capacity (requires CapacityName and ResourceGroupName parameters)
+
+**Capacity-Specific Runbooks (recommended for scheduled automation):**
+- **Resume-Capacity-01.ps1**: Resumes fabricdofnetzeroause01 (hardcoded, no parameters needed)
+- **Resume-Capacity-02.ps1**: Resumes fabricdofnetzeroause02 (hardcoded, no parameters needed)
+- **Pause-Capacity-01.ps1**: Pauses fabricdofnetzeroause01 (hardcoded, no parameters needed)
+- **Pause-Capacity-02.ps1**: Pauses fabricdofnetzeroause02 (hardcoded, no parameters needed)
+
+> **Note**: Capacity-specific runbooks are more reliable for scheduled automation because Azure Automation job schedules can sometimes lose parameter values.
 
 ### 2. Configuration
 Located in `scripts/`:
@@ -39,10 +49,13 @@ Located in `scripts/`:
 ## Prerequisites
 
 - Azure Subscription with Fabric Capacity
-- Azure Automation Account
+- Azure Automation Account with **System-Assigned Managed Identity** enabled
 - PowerShell 5.1 or later (or PowerShell 7+)
-- Az PowerShell modules installed
-- Appropriate RBAC permissions (Contributor or higher on the Automation Account and Fabric Capacity resources)
+- Azure CLI installed and authenticated
+- Appropriate RBAC permissions:
+  - Contributor on the Automation Account
+  - Contributor on the Fabric Capacity resources
+  - The Automation Account's Managed Identity needs Contributor role on the Fabric Capacity
 
 ## Setup Instructions
 
@@ -85,9 +98,16 @@ Run the schedule creation script once for each capacity:
 
 Each capacity gets its own unique set of schedules.
 
-### Step 3: Verify Run As Account
+### Step 3: Configure Managed Identity
 
-Ensure your Automation Account has a **"Run As Account"** (classic) for authentication. This is required for the runbooks to execute with proper permissions.
+Ensure your Automation Account has a **System-Assigned Managed Identity** enabled:
+
+1. Go to your Automation Account in Azure Portal
+2. Navigate to **Identity** under Account Settings
+3. Enable **System assigned** managed identity
+4. Grant the managed identity **Contributor** role on your Fabric Capacity resources
+
+> **Note**: The runbooks use `Connect-AzAccount -Identity` for authentication via Managed Identity. The legacy "Run As Account" is deprecated.
 
 ## How It Works
 
@@ -115,17 +135,18 @@ Monitor the runbook execution in the Azure Portal:
 ## Troubleshooting
 
 ### Runbooks Not Executing
-- Verify the Automation Account has a valid "Run As Account"
-- Check that the schedules are properly linked to the runbooks
+- Verify the Automation Account has Managed Identity enabled
+- Check that the schedules are properly linked to the runbooks (see Azure Portal → Automation Account → Schedules → Linked runbooks)
 - Review job history in the Azure Portal for error details
 
 ### Authentication Failures
-- Ensure the Run As Account has proper RBAC permissions on the Fabric Capacity
-- Verify the subscription and resource group names in the config
+- Ensure the Managed Identity has Contributor RBAC permissions on the Fabric Capacity
+- Verify the subscription and resource group names in the runbook
+- Check that Az.Accounts and Az.Fabric modules are available in the Automation Account
 
-### Timezone Issues
-- Update the `timezone` field in config.json to match your location
-- Azure Automation schedules use UTC by default; check timezone settings in the Portal
+### Schedule Not Linked to Runbook
+- Azure Automation job schedules can silently fail to link. Verify in Azure Portal that each schedule shows the correct runbook under "Linked runbooks"
+- Use capacity-specific runbooks (e.g., Pause-Capacity-01.ps1) which don't require parameters
 
 ## Cost Optimization
 
@@ -142,12 +163,16 @@ az automation schedule delete --resource-group "your-rg" --automation-account-na
 az automation schedule delete --resource-group "your-rg" --automation-account-name "your-account" --name "Fabric-Capacity-Pause-Weekdays" --yes
 az automation schedule delete --resource-group "your-rg" --automation-account-name "your-account" --name "Fabric-Capacity-Pause-Weekend" --yes
 
-# Delete runbooks
+# Delete runbooks (generic)
 az automation runbook delete --resource-group "your-rg" --automation-account-name "your-account" --name "Resume-Capacity" --yes
 az automation runbook delete --resource-group "your-rg" --automation-account-name "your-account" --name "Pause-Capacity" --yes
 
+# Delete runbooks (capacity-specific, if created)
+az automation runbook delete --resource-group "your-rg" --automation-account-name "your-account" --name "Resume-Capacity-01" --yes
+az automation runbook delete --resource-group "your-rg" --automation-account-name "your-account" --name "Pause-Capacity-01" --yes
+
 # Manually resume capacity if needed
-az resource update --resource-group "your-rg" --name "your-capacity-name" --resource-type "Microsoft.Fabric/capacities" --set "properties.state=Active"
+az fabric capacity resume --resource-group "your-rg" --capacity-name "your-capacity-name"
 ```
 
 ## Contributing
