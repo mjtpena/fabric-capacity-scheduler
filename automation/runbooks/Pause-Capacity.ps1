@@ -2,61 +2,59 @@
 .SYNOPSIS
     Pauses an Azure Fabric Capacity outside of business hours
 .DESCRIPTION
-    This runbook pauses an active Azure Fabric Capacity
+    This runbook pauses an active Azure Fabric Capacity using the REST API
     Called by Azure Automation at 8:00 PM on weekdays and all day on weekends
-.PARAMETER CapacityName
-    The name of the Fabric Capacity to pause
+    Uses Managed Identity for authentication
+.PARAMETER SubscriptionId
+    The Azure subscription ID containing the capacity
 .PARAMETER ResourceGroupName
     The resource group containing the capacity
+.PARAMETER CapacityName
+    The name of the Fabric Capacity to pause
 #>
 
 param(
-    [Parameter(Mandatory = $false)]
-    [string]$CapacityName,
+    [Parameter(Mandatory = $true)]
+    [string]$SubscriptionId,
     
-    [Parameter(Mandatory = $false)]
-    [string]$ResourceGroupName
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroupName,
+    
+    [Parameter(Mandatory = $true)]
+    [string]$CapacityName
 )
 
-# Use Run As Account for authentication
-$AzureRunAsConnectionName = "AzureRunAsConnection"
-
 try {
-    # Get the connection
-    $AzureRunAsConnection = Get-AutomationConnection -Name $AzureRunAsConnectionName
+    Write-Output "Starting pause operation for capacity: $CapacityName"
     
-    if ($null -eq $AzureRunAsConnection) {
-        throw "Connection $AzureRunAsConnectionName not found in Automation Account"
+    # Connect using Managed Identity
+    Connect-AzAccount -Identity | Out-Null
+    Write-Output "Connected using Managed Identity."
+    
+    # Get token for Azure Management API using SecureString (required for newer Az.Accounts)
+    $tokenResponse = Get-AzAccessToken -ResourceUrl "https://management.azure.com" -AsSecureString
+    $ssPtr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($tokenResponse.Token)
+    try {
+        $token = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ssPtr)
+    } finally {
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ssPtr)
+    }
+    Write-Output "Acquired access token."
+    
+    # Build the suspend URL
+    $uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Fabric/capacities/$CapacityName/suspend?api-version=2023-11-01"
+    
+    # Call the suspend API
+    $headers = @{
+        "Authorization" = "Bearer $token"
+        "Content-Type" = "application/json"
     }
     
-    Write-Output "Connecting to Azure using Run As Account..."
-    Add-AzAccount -ServicePrincipal `
-        -TenantId $AzureRunAsConnection.TenantId `
-        -ApplicationId $AzureRunAsConnection.ApplicationId `
-        -CertificateThumbprint $AzureRunAsConnection.CertificateThumbprint | Out-Null
+    Write-Output "Calling suspend API..."
+    $response = Invoke-WebRequest -Uri $uri -Method POST -Headers $headers -UseBasicParsing
+    Write-Output "API Response Status: $($response.StatusCode)"
     
-    # Set the subscription context
-    Set-AzContext -SubscriptionId $AzureRunAsConnection.SubscriptionId | Out-Null
-    
-    if ([string]::IsNullOrEmpty($CapacityName)) {
-        throw "CapacityName parameter is required"
-    }
-    if ([string]::IsNullOrEmpty($ResourceGroupName)) {
-        throw "ResourceGroupName parameter is required"
-    }
-    
-    Write-Output "Pausing Fabric Capacity: $CapacityName in Resource Group: $ResourceGroupName"
-    
-    # Pause the capacity
-    $capacity = Update-AzCapacity -Name $CapacityName -ResourceGroupName $ResourceGroupName -State "Paused"
-    
-    if ($capacity.State -eq "Paused") {
-        Write-Output "Successfully paused Fabric Capacity: $CapacityName"
-        Write-Output "Capacity State: $($capacity.State)"
-    }
-    else {
-        Write-Output "Capacity state after update: $($capacity.State)"
-    }
+    Write-Output "Successfully paused Fabric Capacity: $CapacityName"
 }
 catch {
     Write-Error "Error pausing capacity: $_"

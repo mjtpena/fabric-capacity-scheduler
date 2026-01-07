@@ -9,11 +9,12 @@
 # Hardcoded parameters for this specific capacity
 $CapacityName = "fabricdofnetzeroause01"
 $ResourceGroupName = "RG-DoF-NetZero-DevPTS"
+$SubscriptionId = "04d900ce-83c5-47d5-8d61-45ac8e1e984a"
 
 try {
     # Connect using Managed Identity
     Write-Output "Connecting to Azure using Managed Identity..."
-    Connect-AzAccount -Identity | Out-Null
+    Connect-AzAccount -Identity -Subscription $SubscriptionId | Out-Null
     
     Write-Output "Resuming Fabric Capacity: $CapacityName in Resource Group: $ResourceGroupName"
     

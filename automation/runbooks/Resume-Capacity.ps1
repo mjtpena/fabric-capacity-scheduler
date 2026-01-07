@@ -2,61 +2,59 @@
 .SYNOPSIS
     Resumes an Azure Fabric Capacity at the start of business hours
 .DESCRIPTION
-    This runbook resumes a paused Azure Fabric Capacity
+    This runbook resumes a paused Azure Fabric Capacity using the REST API
     Called by Azure Automation at 8:00 AM on weekdays
-.PARAMETER CapacityName
-    The name of the Fabric Capacity to resume
+    Uses Managed Identity for authentication
+.PARAMETER SubscriptionId
+    The Azure subscription ID containing the capacity
 .PARAMETER ResourceGroupName
     The resource group containing the capacity
+.PARAMETER CapacityName
+    The name of the Fabric Capacity to resume
 #>
 
 param(
-    [Parameter(Mandatory = $false)]
-    [string]$CapacityName,
+    [Parameter(Mandatory = $true)]
+    [string]$SubscriptionId,
     
-    [Parameter(Mandatory = $false)]
-    [string]$ResourceGroupName
+    [Parameter(Mandatory = $true)]
+    [string]$ResourceGroupName,
+    
+    [Parameter(Mandatory = $true)]
+    [string]$CapacityName
 )
 
-# Use Run As Account for authentication
-$AzureRunAsConnectionName = "AzureRunAsConnection"
-
 try {
-    # Get the connection
-    $AzureRunAsConnection = Get-AutomationConnection -Name $AzureRunAsConnectionName
+    Write-Output "Starting resume operation for capacity: $CapacityName"
     
-    if ($null -eq $AzureRunAsConnection) {
-        throw "Connection $AzureRunAsConnectionName not found in Automation Account"
+    # Connect using Managed Identity
+    Connect-AzAccount -Identity | Out-Null
+    Write-Output "Connected using Managed Identity."
+    
+    # Get token for Azure Management API using SecureString (required for newer Az.Accounts)
+    $tokenResponse = Get-AzAccessToken -ResourceUrl "https://management.azure.com" -AsSecureString
+    $ssPtr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($tokenResponse.Token)
+    try {
+        $token = [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ssPtr)
+    } finally {
+        [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ssPtr)
+    }
+    Write-Output "Acquired access token."
+    
+    # Build the resume URL
+    $uri = "https://management.azure.com/subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/Microsoft.Fabric/capacities/$CapacityName/resume?api-version=2023-11-01"
+    
+    # Call the resume API
+    $headers = @{
+        "Authorization" = "Bearer $token"
+        "Content-Type" = "application/json"
     }
     
-    Write-Output "Connecting to Azure using Run As Account..."
-    Add-AzAccount -ServicePrincipal `
-        -TenantId $AzureRunAsConnection.TenantId `
-        -ApplicationId $AzureRunAsConnection.ApplicationId `
-        -CertificateThumbprint $AzureRunAsConnection.CertificateThumbprint | Out-Null
+    Write-Output "Calling resume API..."
+    $response = Invoke-WebRequest -Uri $uri -Method POST -Headers $headers -UseBasicParsing
+    Write-Output "API Response Status: $($response.StatusCode)"
     
-    # Set the subscription context
-    Set-AzContext -SubscriptionId $AzureRunAsConnection.SubscriptionId | Out-Null
-    
-    if ([string]::IsNullOrEmpty($CapacityName)) {
-        throw "CapacityName parameter is required"
-    }
-    if ([string]::IsNullOrEmpty($ResourceGroupName)) {
-        throw "ResourceGroupName parameter is required"
-    }
-    
-    Write-Output "Resuming Fabric Capacity: $CapacityName in Resource Group: $ResourceGroupName"
-    
-    # Resume the capacity
-    $capacity = Update-AzCapacity -Name $CapacityName -ResourceGroupName $ResourceGroupName -State "Active"
-    
-    if ($capacity.State -eq "Active") {
-        Write-Output "Successfully resumed Fabric Capacity: $CapacityName"
-        Write-Output "Capacity State: $($capacity.State)"
-    }
-    else {
-        Write-Output "Capacity state after update: $($capacity.State)"
-    }
+    Write-Output "Successfully resumed Fabric Capacity: $CapacityName"
 }
 catch {
     Write-Error "Error resuming capacity: $_"

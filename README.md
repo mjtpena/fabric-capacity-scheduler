@@ -59,7 +59,33 @@ Located in `scripts/`:
 
 ## Setup Instructions
 
-### Step 1: Deploy Runbooks
+### Step 1: Import Required Modules
+
+**⚠️ IMPORTANT**: The `Az.Fabric` PowerShell module must be imported into your Azure Automation Account before the runbooks will work. This module provides the cmdlets needed to manage Fabric Capacity:
+- `Get-AzFabricCapacity` - Check capacity state
+- `Suspend-AzFabricCapacity` - Pause capacity
+- `Resume-AzFabricCapacity` - Resume capacity
+
+**Option A: Using the import script (recommended)**
+```powershell
+cd scripts
+.\import-modules.ps1 `
+  -SubscriptionId "your-subscription-id" `
+  -ResourceGroupName "your-resource-group" `
+  -AutomationAccountName "your-automation-account"
+```
+
+**Option B: Via Azure Portal**
+1. Go to your **Azure Automation Account** in the Azure Portal
+2. Navigate to **Shared Resources** → **Modules**
+3. Click **Browse gallery**
+4. Search for **Az.Fabric**
+5. Select it and click **Import**
+6. Wait for the import to complete (5-10 minutes)
+
+> **Note**: Module import can take several minutes. Wait until the status shows "Available" before running runbooks.
+
+### Step 2: Deploy Runbooks
 
 Run this command from the `scripts` folder:
 
@@ -71,7 +97,7 @@ cd scripts
   -AutomationAccountName "your-automation-account"
 ```
 
-### Step 2: Create Schedules
+### Step 3: Create Schedules
 
 ```powershell
 .\create-schedules.ps1 `
@@ -98,7 +124,7 @@ Run the schedule creation script once for each capacity:
 
 Each capacity gets its own unique set of schedules.
 
-### Step 3: Configure Managed Identity
+### Step 4: Configure Managed Identity
 
 Ensure your Automation Account has a **System-Assigned Managed Identity** enabled:
 
@@ -134,6 +160,20 @@ Monitor the runbook execution in the Azure Portal:
 
 ## Troubleshooting
 
+### "The term 'Get-AzFabricCapacity' is not recognized"
+This error means the **Az.Fabric** module is not installed in your Automation Account.
+
+**Solution:**
+1. Run the module import script:
+   ```powershell
+   .\import-modules.ps1 -SubscriptionId "..." -ResourceGroupName "..." -AutomationAccountName "..."
+   ```
+2. Or import manually via Azure Portal:
+   - Go to Automation Account → Shared Resources → Modules → Browse gallery
+   - Search for "Az.Fabric" and click Import
+3. **Wait 5-10 minutes** for the module to fully import
+4. Verify the module status shows "Available" before re-running the runbook
+
 ### Runbooks Not Executing
 - Verify the Automation Account has Managed Identity enabled
 - Check that the schedules are properly linked to the runbooks (see Azure Portal → Automation Account → Schedules → Linked runbooks)
@@ -143,6 +183,12 @@ Monitor the runbook execution in the Azure Portal:
 - Ensure the Managed Identity has Contributor RBAC permissions on the Fabric Capacity
 - Verify the subscription and resource group names in the runbook
 - Check that Az.Accounts and Az.Fabric modules are available in the Automation Account
+
+### Module Import Stuck or Failed
+If module import shows "Creating" for more than 15 minutes:
+1. Delete the module from the Automation Account
+2. Re-import using the PowerShell Gallery directly
+3. Try using PowerShell runtime 7.2 if 5.1 doesn't work
 
 ### Schedule Not Linked to Runbook
 - Azure Automation job schedules can silently fail to link. Verify in Azure Portal that each schedule shows the correct runbook under "Linked runbooks"
