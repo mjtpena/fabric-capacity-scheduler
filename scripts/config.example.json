@@ -2,7 +2,10 @@
   "subscriptionId": "00000000-0000-0000-0000-000000000000",
   "resourceGroupName": "your-resource-group",
   "automationAccountName": "your-automation-account",
-  "capacityName": "your-fabric-capacity-name",
+  "capacityNames": [
+    "your-fabric-capacity-01",
+    "your-fabric-capacity-02"
+  ],
   "capacityAdminEmail": "your-email@company.com",
-  "timezone": "Eastern Standard Time"
+  "timezone": "AUS Eastern Standard Time"
 }

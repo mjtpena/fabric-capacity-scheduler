@@ -30,16 +30,17 @@ Located in `automation/runbooks/`:
 - **Pause-Capacity.ps1**: Pauses a Fabric Capacity (requires CapacityName and ResourceGroupName parameters)
 
 **Capacity-Specific Runbooks (recommended for scheduled automation):**
-- **Resume-Capacity-01.ps1**: Resumes fabricdofnetzeroause01 (hardcoded, no parameters needed)
-- **Resume-Capacity-02.ps1**: Resumes fabricdofnetzeroause02 (hardcoded, no parameters needed)
-- **Pause-Capacity-01.ps1**: Pauses fabricdofnetzeroause01 (hardcoded, no parameters needed)
-- **Pause-Capacity-02.ps1**: Pauses fabricdofnetzeroause02 (hardcoded, no parameters needed)
+- **Resume-Capacity-01.ps1**: Resumes first capacity (hardcoded, no parameters needed)
+- **Resume-Capacity-02.ps1**: Resumes second capacity (hardcoded, no parameters needed)
+- **Pause-Capacity-01.ps1**: Pauses first capacity (hardcoded, no parameters needed)
+- **Pause-Capacity-02.ps1**: Pauses second capacity (hardcoded, no parameters needed)
 
-> **Note**: Capacity-specific runbooks are more reliable for scheduled automation because Azure Automation job schedules can sometimes lose parameter values.
+> **Note**: Capacity-specific runbooks are more reliable for scheduled automation because Azure Automation job schedules can sometimes lose parameter values. Update the hardcoded values in these files with your actual Azure resource details before deploying.
 
 ### 2. Configuration
 Located in `scripts/`:
-- **config.json**: Configuration file with your subscription, resource group, and capacity details
+- **config.example.json**: Example configuration file (copy to `config.json` and update with your values)
+- **config.json**: Your local configuration (gitignored - contains sensitive data)
 
 ### 3. Deployment Scripts
 Located in `scripts/`:

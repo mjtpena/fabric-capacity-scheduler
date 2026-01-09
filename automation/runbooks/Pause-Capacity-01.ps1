@@ -1,15 +1,16 @@
 <#
 .SYNOPSIS
-    Pauses Azure Fabric Capacity fabricdofnetzeroause01
+    Pauses Azure Fabric Capacity (Capacity 01)
 .DESCRIPTION
-    This runbook pauses the fabricdofnetzeroause01 Fabric Capacity
+    This runbook pauses the first Fabric Capacity
     Called by Azure Automation at 8:00 PM on weekdays and weekends
 #>
 
 # Hardcoded parameters for this specific capacity
-$CapacityName = "fabricdofnetzeroause01"
-$ResourceGroupName = "RG-DoF-NetZero-DevPTS"
-$SubscriptionId = "04d900ce-83c5-47d5-8d61-45ac8e1e984a"
+# TODO: Update these values with your actual Azure resource details
+$CapacityName = "your-fabric-capacity-01"
+$ResourceGroupName = "your-resource-group"
+$SubscriptionId = "00000000-0000-0000-0000-000000000000"
 
 try {
     # Connect using Managed Identity

@@ -1,19 +1,21 @@
 <#
 .SYNOPSIS
-    Resumes Azure Fabric Capacity fabricdofnetzeroause02
+    Resumes Azure Fabric Capacity (Capacity 02)
 .DESCRIPTION
-    This runbook resumes the fabricdofnetzeroause02 Fabric Capacity
+    This runbook resumes the second Fabric Capacity
     Called by Azure Automation at 8:00 AM on weekdays
 #>
 
 # Hardcoded parameters for this specific capacity
-$CapacityName = "fabricdofnetzeroause02"
-$ResourceGroupName = "RG-DoF-NetZero-DevPTS"
+# TODO: Update these values with your actual Azure resource details
+$CapacityName = "your-fabric-capacity-02"
+$ResourceGroupName = "your-resource-group"
+$SubscriptionId = "00000000-0000-0000-0000-000000000000"
 
 try {
     # Connect using Managed Identity
     Write-Output "Connecting to Azure using Managed Identity..."
-    Connect-AzAccount -Identity | Out-Null
+    Connect-AzAccount -Identity -Subscription $SubscriptionId | Out-Null
     
     Write-Output "Resuming Fabric Capacity: $CapacityName in Resource Group: $ResourceGroupName"
     

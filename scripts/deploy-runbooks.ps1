@@ -86,30 +86,41 @@ Write-Output "`n========================================"
 Write-Output "Step 2: Deploying Runbooks"
 Write-Output "========================================"
 
-# Define runbook files
+# Define runbook files - deploying capacity-specific runbooks
 $runbookPath = "../automation/runbooks"
 $runbooks = @(
     @{
-        Name = "Resume-Capacity"
-        Path = Join-Path $runbookPath "Resume-Capacity.ps1"
-        Description = "Resumes Azure Fabric Capacity at 8:00 AM on weekdays"
+        Name = "Resume-Capacity-01"
+        Path = Join-Path $runbookPath "Resume-Capacity-01.ps1"
+        Description = "Resumes Azure Fabric Capacity fabricdofnetzeroause01 at 8:00 AM on weekdays"
     },
     @{
-        Name = "Pause-Capacity"
-        Path = Join-Path $runbookPath "Pause-Capacity.ps1"
-        Description = "Pauses Azure Fabric Capacity at 8:00 PM on weekdays and all day on weekends"
+        Name = "Resume-Capacity-02"
+        Path = Join-Path $runbookPath "Resume-Capacity-02.ps1"
+        Description = "Resumes Azure Fabric Capacity fabricdofnetzeroause02 at 8:00 AM on weekdays"
+    },
+    @{
+        Name = "Pause-Capacity-01"
+        Path = Join-Path $runbookPath "Pause-Capacity-01.ps1"
+        Description = "Pauses Azure Fabric Capacity fabricdofnetzeroause01 at 8:00 PM on weekdays"
+    },
+    @{
+        Name = "Pause-Capacity-02"
+        Path = Join-Path $runbookPath "Pause-Capacity-02.ps1"
+        Description = "Pauses Azure Fabric Capacity fabricdofnetzeroause02 at 8:00 PM on weekdays"
     }
 )
 
 # Import and publish runbooks
 Write-Output "`nImporting runbooks..."
 foreach ($runbook in $runbooks) {
-    if (-not (Test-Path $runbook.Path)) {
-        Write-Error "Runbook file not found: $($runbook.Path)"
+    $fullPath = (Resolve-Path $runbook.Path).Path
+    if (-not (Test-Path $fullPath)) {
+        Write-Error "Runbook file not found: $fullPath"
         exit 1
     }
     
-    Write-Output "Importing: $($runbook.Name)"
+    Write-Output "Importing: $($runbook.Name) from $fullPath"
     
     # Create runbook
     az automation runbook create `
@@ -117,14 +128,14 @@ foreach ($runbook in $runbooks) {
         --resource-group $ResourceGroupName `
         --name $runbook.Name `
         --type PowerShell `
-        --description $runbook.Description | Out-Null
+        --description $runbook.Description 2>$null | Out-Null
     
-    # Import content
-    az automation runbook content update `
+    # Replace content using file path
+    az automation runbook replace-content `
         --automation-account-name $AutomationAccountName `
         --resource-group $ResourceGroupName `
         --name $runbook.Name `
-        --content (Get-Content $runbook.Path -Raw) | Out-Null
+        --content "@$fullPath" | Out-Null
     
     # Publish runbook
     az automation runbook publish `
